@@ -51,6 +51,7 @@ const CardsPage: React.FC = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<Set<Season>>(new Set());
   const [selectedAttachment, setSelectedAttachment] = useState<{url: string, type: string, name: string} | null>(null);
+  const [draggedCard, setDraggedCard] = useState<number | null>(null);
   const [seasonMenuAnchor, setSeasonMenuAnchor] = useState<{
     element: HTMLElement | null;
     cardId: string | null;
@@ -254,6 +255,49 @@ const CardsPage: React.FC = () => {
     }
   };
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    setDraggedCard(index);
+    e.currentTarget.style.opacity = '0.5';
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+    e.currentTarget.style.opacity = '1';
+    setDraggedCard(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, dropIndex: number) => {
+    e.preventDefault();
+    
+    if (draggedCard === null) return;
+    
+    const newCards = [...filteredCards];
+    const draggedItem = newCards[draggedCard];
+    
+    // Supprime l'élément de sa position actuelle
+    newCards.splice(draggedCard, 1);
+    // Insère l'élément à sa nouvelle position
+    newCards.splice(dropIndex, 0, draggedItem);
+    
+    setFilteredCards(newCards);
+    setCards(prevCards => {
+      const updatedCards = [...prevCards];
+      // Met à jour l'ordre dans la liste complète des cartes
+      const cardIndexInFullList = prevCards.findIndex(card => card.id === draggedItem.id);
+      const dropIndexInFullList = prevCards.findIndex(card => card.id === newCards[dropIndex === 0 ? 0 : dropIndex - 1]?.id) + 1;
+      
+      updatedCards.splice(cardIndexInFullList, 1);
+      updatedCards.splice(dropIndexInFullList, 0, draggedItem);
+      
+      return updatedCards;
+    });
+  };
+
   if (loading && cards.length === 0) {
     return (
       <Container>
@@ -291,8 +335,24 @@ const CardsPage: React.FC = () => {
         </Stack>
 
         <Grid container spacing={3}>
-          {filteredCards.map((card) => (
-            <Grid item xs={12} sm={6} md={4} key={card.id}>
+          {filteredCards.map((card, index) => (
+            <Grid item key={card.id} xs={12} sm={6} md={4}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragEnd={handleDragEnd}
+              onDragOver={handleDragOver}
+              onDrop={(e) => handleDrop(e, index)}
+              sx={{
+                cursor: 'move',
+                '& > *': {
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: (theme) => theme.shadows[4],
+                  },
+                },
+              }}
+            >
               <MuiCard sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
